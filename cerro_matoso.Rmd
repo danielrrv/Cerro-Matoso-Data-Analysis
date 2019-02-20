@@ -1,0 +1,292 @@
+---
+title: "Cerro Matoso Analysis"
+date : '`r format(Sys.Date(), "%B %d, %Y")`'
+author: 'Daniel Rodriguez'
+output: 
+   html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+
+---
+
+
+<style>
+
+p{
+
+font-family:Helvetica;
+font-weight:400;
+
+}
+
+ul li {
+font-family:Helvetica;
+font-weight:400;
+
+}
+
+
+
+
+
+
+
+</style>
+
+## Introduction
+This is an data analysis  of some important KPIs in Cerro Matoso,  a Colombian Nickel Mine. The data set has 11 variables and 10006 observation, that are operational variables over a 1 year of records in 2 shift, day and night. The equipment are truck  CAT777 operated by humans. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, error=FALSE}
+library(dplyr)
+library(tidyr)
+library(readr)
+library(readxl)
+library(ggplot2)
+library(corrplot)
+cerro_matoso<-read_excel(path = 'C:/Users/ASUS/DownloadS/cerro_matoso.xlsx', sheet='DISPONIBILIDAD')
+cerro_matoso_1 <- cerro_matoso %>% filter(Flota=="Camiones 777")%>%select(fecha,Turno,Operativo, Equipo,`Mant Preventiva`,`Mant Planeada`,`Mant Correctiva`,`Over Haul`, `Demora Prog `, `Demora Noprog `, DemoraStandBy)
+```
+
+
+## Analysis{.tabset}
+
+
+### Data
+
+
+
+**1. cerro_matoso_1 dataset**
+The data set consists in 11 variables and 10006 observations. following the dictionary is listed.
+
+
++ **Fecha**:  A date object that goes  from 2017-07-01 to 2018-06-24 
++ **Turno**: It contains a categorical variable  2 factor('dia','noche').
++ **Operativo**: A numerical Variable that comes from 0 Hours to 12 hour(a shift) per truck. THis is the real time where a truck or Equipo moves raw material over the mine. it's like the effective time of operation.
++ **Equipo:**A categorical variable with 14 factor; Every mine's dumb truck CAT777 of 100 Ton. From M3-32 to M3-45.
++ **Mant Preventiva:** Is a numerical variable that comes from 0 to 12 hours(shif) per truck. A truck can be down by maintenance for 12 hours per shift. it  is related to time of preventive maintenance.
++ **Mant Planeada:** Is a numerica variable that comes from 0 to 12 hour(shift) per truck. Likewise, a truck can be down by 12 hours. this is maintenance.
++ **Mant correctiva:** Is a numerical variable and it comes down to another maintenance time.
++ **over haul:** Have you ever watch OVERHaulin' in TV, Something like that. when a truck is in a long maintanence stage.
++ **Demora prog:** Is a numerical variable that it is related to  non-operational and non-maintenance time. it's when the operator take a lunch, change shift or wait for fuel supply.
++ **Demora No prog:** Is a numerical variable and is related to another non-operational and non-maintenance time. it's aside of Programada programada it can not be planned early, for instance, a brast or get stuck in the ground when it is raining even when it raining.
++ **DemoraStanBy:** When a truck is no longer needed. it can be put in standby.
+
+
+```{r }
+knitr::kable(cerro_matoso_1[1:5, ])
+```
+ 
+ 
+**2. cerro_matoso_group dataset**
+ 
+ This is a wrangling of the  **cerro_matoso_1**.  You may see the operation in following script.
+ 
+ 
+ 
+```{r echo=TRUE}
+ cerro_matoso_group<-cerro_matoso_1%>%
+  group_by(fecha, Turno)%>%summarize(
+    Operativo=sum(Operativo),
+    preventiva=sum(`Mant Preventiva`),
+    planeada=sum(`Mant Planeada`),
+    correctiva=sum(`Mant Correctiva`),
+    overall=sum(`Over Haul`),
+    programada=sum(`Demora Prog `),
+    noprogramada=sum(`Demora Noprog `),
+    stanby=sum(DemoraStandBy))%>%
+  mutate(Tcalendario=(Operativo+preventiva+planeada+correctiva+overall+programada+noprogramada),
+    disponibilidad=(Tcalendario-preventiva-correctiva-planeada-overall)/Tcalendario,
+    utilizacion=Operativo/(Tcalendario-preventiva-correctiva-planeada-overall))
+ 
+ 
+
+
+
+```
+```{r }
+knitr::kable(cerro_matoso_group[1:5, ])
+```
+
+
+
+ In summary it turns out that is needed summarized how much time have each  times taken group by date an shift of the all truck. Moreover, 3 variable are mutated to a dataframe, the first *Tcalendario* is the sum of;
+ 
+$$preventiva + planeada + correctiva + overall +programada + noprogramada$$
+ 
+ 
+disponibilidad that is:
+
+$$\%disponibilidad  = \frac{Tcalendario-preventiva-correctiva-planeada-overall}{Tcalendario}$$
+  
+As you can see, disponibilidad is a rate of percentange which assesses the  equipment  and maintenance group performance. 
+ 
+Other variable added is utilization that is 
+ 
+$$\%utilizacion =\frac{operativo}{Tcalendario-preventiva-planeada-correctiva-overall}$$.
+
+ 
+Like disponibilidad, utilizacion a rate of how effective the operation use the equipments for moving material over the time delived by maintenance. 
+ 
+ 
+
+
+ 
+ **3. cerro_matoso_equipo**
+ 
+ 
+```{r }
+cerro_matoso_equipo <- cerro_matoso_1%>%group_by(fecha,Equipo)%>%
+  summarize(
+    Operativo=sum(Operativo),
+    preventiva=sum(`Mant Preventiva`),
+    planeada=sum(`Mant Planeada`),
+    correctiva=sum(`Mant Correctiva`),
+    overall=sum(`Over Haul`),
+    programada=sum(`Demora Prog `),
+    noprogramada=sum(`Demora Noprog `),
+    stanby=sum(DemoraStandBy))%>%
+  mutate(
+    Tcalendario=(Operativo+preventiva+planeada+correctiva+overall+programada+noprogramada),
+    disponibilidad=(Tcalendario-preventiva-correctiva-planeada-overall)/Tcalendario,
+    utilizacion=Operativo/(Tcalendario-preventiva-correctiva-planeada-overall))   
+
+
+knitr::kable(cerro_matoso_equipo[1:5, ])
+```
+
+**4. cerro_matoso_gather**
+
+```{r}
+cerro_matoso_gather<-cerro_matoso_1%>%
+  group_by(fecha)%>%
+  summarize(
+    Operativo=sum(Operativo),
+    preventiva=sum(`Mant Preventiva`),
+    planeada=sum(`Mant Planeada`),
+    correctiva=sum(`Mant Correctiva`),
+    overall=sum(`Over Haul`),
+    programada=sum(`Demora Prog `),
+    noprogramada=sum(`Demora Noprog `),
+    stanby=sum(DemoraStandBy))%>%
+  mutate(
+    Tcalendario=(Operativo+preventiva+planeada+correctiva+overall+programada+noprogramada),
+    disponibilidad=(Tcalendario-preventiva-correctiva-planeada-overall)/Tcalendario,
+    utilizacion=Operativo/(Tcalendario-preventiva-correctiva-planeada-overall))%>%
+  select(fecha,disponibilidad, utilizacion) %>%gather(key = categoria,value=value,-fecha)
+
+
+
+
+
+knitr::kable(cerro_matoso_gather[1:5, ])
+```
+
+### plots
+
+Ones of the most important mine KPIs are disponibilidad and utilizacion. Both are often taken as part of bussiness cases in which are the features to being optimized. Nevertheless, previously, before this essay both were taken as individual variables without any correlation  to each other. What it is false. The projects were bogus due to just make effort on reducing one of them without see the behavior of the another. what it leds to mistakes and non-appoined result. So it is neeeded whether a correlation exists. To see so, it may be carried out a correlation plot or a inferential analysis(F statistic, T student). However for being sharp, we'd rather liked a Simple linear regression, where whether the changes in utilization are due to chance  and there's no relation with disponibilidad or there's is relation.
+
+We can frame this investigation into statistical hyphothesis test
+
+**H0:** Slope=0, The true linear model has slope and there's no relation between  disponibilidad and utilization
+
+**HA:** slope =!0, the true linear model has a slope different to zero, and utilization's change is related to disponibilidad.
+
+
+
+
+```{r}
+##----------lays out utilization vs disponibilidad coloured by shift.
+##----------furthermore,method  simple linear regresion line for more interpretability.
+ggplot(cerro_matoso_group, aes(x=disponibilidad, y=utilizacion, col=Turno))+
+  geom_point()+geom_smooth(se = F,method = lm)
+
+```
+
+
+As it can seen graphically, there's non-zero slope what it means the change in utilization can be explain with changes in disponibilidad, thereby aren't separeted features. To do a stronger proof. Linear model summary can show a better approach.
+
+```{r}
+
+lm(utilizacion~disponibilidad, data=cerro_matoso_group)%>%
+  summary()
+
+
+```
+
+
+Here can be seen:
+
++ p-value of disponibilidad slope is nearly zero, whereby we successfully  reject the null hyphotesis we initially put above.
++ only  8% of utilizacion is explained by disponibilidad(R-squared)
++ the slope is negative. which it means that when disponibilidad increases less utilization can be performance by  the  mine operation.
+
+
+
+The main reason whereby when disponibilidad increases, utilization decreses is because more equipment are available and the same people are using the truck,something like lack of staff.The opposite occurs when the disponibilidad decreases, the utilizacion increase unexpectedly.Then engineers can say, their good management of the flets are giving result.
+
+```{r}
+ggplot(cerro_matoso_gather,aes(x=fecha, y=value, col=categoria))+geom_line()
+```
+
+
+*see when the disponibilidad goes downward the utilizacion goes upward*
+
+The previous conclusion opens up widely window where we can see the correlation among the perfomance KPIs
+*let's do it!*
+
+**correlation plot**
+
+
+
+```{r echo=FALSE}
+
+cor_cerro_matoso <- cor(cerro_matoso_group[,3:13])
+corrplot::corrplot(cor_cerro_matoso,type = "upper",order = 'AOE',addCoef.col = T,tl.col = 'black')
+
+```
+
+
+Many  hidden correlations suddenly pop up. Yes there's  negative correlation between utilizacion and disponibilidad, isn't strong but it exists.Following conclusions can be taken from the plot
+
+
+>First of all, the correlation above is just a pearson correlation that doesn't include categorical variable like **Turno** that can incoporate different aproaches. It may turn out that **simpson's paradox** comes in and the behavior doesn't occur anymore.
+
+
++ It looks like Tcalendario has the strongest correlation with Standby. It turns out that when the Tcalendario decrease is because a truck or some truck have been put on standby.
++ Operativo is highly affected by utilizacion, what it can be seen as pros or as cons. We could say " let's increase utilizacion and then we would have better operativo time" nevertheless  a increasing in operativo time not only depend on utilization and utilization doesn't depend on itself. Cofounding can occur.
++ Going forward an obvious correlation exists between **utilizacion** and **programada**  and indeed a strong correlation between **programada** and **operativo**. whether we want to carry out a multiple linear regression, both as much as programada and utilizacion are collinear, we should drop out one of them.
++ Forget simpson's paradox for a while; **standby** and **operativo** have a unexpected correlation. why is there a correlation between two features that seems not to be linked at all?
+
+A scatter plot can show why.
+
+```{r echo=FALSE, warning=F,message=F}
+##----------------------------lays out utilization vs standby coloured by shift.
+##----------------------------notice the  standby's effect over utilization regard to shift. 
+library(gridExtra)
+p1=ggplot(cerro_matoso_group, aes(x=stanby, y=Operativo))+
+  geom_point( )+geom_smooth(se = F,method = lm)
+p2=ggplot(cerro_matoso_group, aes(x=stanby, y=Operativo,col=Turno))+
+  geom_point( )+geom_smooth(se = F,method = lm)
+grid.arrange(p1, p2, nrow = 1)
+```
+
+
+As it has been shown, simpson's paradox displays other a clue about the effect standy is able to do when **Turno** pops up.
+
+
+
+```{r}
+ggplot(cerro_matoso_group, aes(x=stanby, y=utilizacion,col=Turno))+
+  geom_point( )+geom_smooth(se = F,method = lm)
+
+```
+
+Look at this! it seems like utilizacion is influenced by Turno when it is night.So there might be increments in utilizacion due to standby. So the advice  only apply at night, so engineer,  let's check closer why does utilizacion increase. 
+
+
+
+
+
+

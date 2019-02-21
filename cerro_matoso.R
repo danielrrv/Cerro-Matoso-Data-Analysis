@@ -41,6 +41,28 @@ cerro_matoso_gather<-cerro_matoso_1%>%
     disponibilidad=(Tcalendario-preventiva-correctiva-planeada-overall)/Tcalendario,
     utilizacion=Operativo/(Tcalendario-preventiva-correctiva-planeada-overall))%>%
   select(fecha,disponibilidad, utilizacion) %>%gather(key = categoria,value=value,-fecha)
+
+##------------------------------by date but without gather--------------------
+
+cerro_matoso_date<-cerro_matoso_1%>%
+  group_by(fecha)%>%
+  summarize(
+    Operativo=sum(Operativo),
+    preventiva=sum(`Mant Preventiva`),
+    planeada=sum(`Mant Planeada`),
+    correctiva=sum(`Mant Correctiva`),
+    overall=sum(`Over Haul`),
+    programada=sum(`Demora Prog `),
+    noprogramada=sum(`Demora Noprog `),
+    stanby=sum(DemoraStandBy))%>%
+  mutate(
+    Tcalendario=(Operativo+preventiva+planeada+correctiva+overall+programada+noprogramada),
+    disponibilidad=(Tcalendario-preventiva-correctiva-planeada-overall)/Tcalendario,
+    utilizacion=Operativo/(Tcalendario-preventiva-correctiva-planeada-overall))%>%
+  select(fecha,disponibilidad, utilizacion) 
+
+
+
   
 ##---------------------------thirth summary by equipment and date-------------------------
 cerro_matoso_equipo <- cerro_matoso_1%>%group_by(fecha,Equipo)%>%
@@ -68,15 +90,32 @@ ggplot(cerro_matoso_group, aes(x=disponibilidad, y=utilizacion, col=Turno))+
 ##----------------------------notice the  standby's effect over utilization regard to shift. 
 ggplot(cerro_matoso_group, aes(x=stanby, y=utilizacion,col=Turno))+
   geom_point( )+geom_smooth(se = F,method = lm)
+#############################
+ggplot(cerro_matoso_group, aes(x=stanby, y=Operativo))+
+  geom_point( )+geom_smooth(se = F,method = lm)
 
+
+#############
 ##----------------------------lays out a time serie showing the disponibilidad and utilization along with date.------- 
-
+library(dygraphs)
+library(xts)
+cerro_xts<-xts(cerro_matoso_date[,2:3],cerro_matoso_date$fecha)
+dygraph(cerro_xts)%>% dyRangeSelector()
 ggplot(cerro_matoso_gather,aes(x=fecha, y=value, col=categoria))+geom_line()
 ##---------------------------lays out  a boxplot as a proof of different operativo's time.
 ggplot(cerro_matoso_equipo,aes(x=Equipo,y=Operativo, col=Equipo))+geom_boxplot()
+
+
+
+
+
 ##-------------------------corrplot-----------------------------------------------
 cor_cerro_matoso <- cor(cerro_matoso_group[,3:13])
 cor_cerro_matoso_equipo<-cerro_matoso_equipo[,3:13] %>% filter(!is.na(utilizacion))%>%cor()
+
+
+
+
 
 
 corrplot::corrplot(cor_cerro_matoso,type = "upper",order = 'AOE',addCoef.col = T,tl.col = 'black')
@@ -89,11 +128,7 @@ corrplot::corrplot.mixed(cor_cerro_matoso,tl.pos = "lt")
 
                                                                         
   
-                                                                        
-                      
-
-
-
+pair.wise=pairwise.t.test(cerro_matoso_equipo$Operativo,cerro_matoso_equipo$Equipo, alternative = "two.sided")
 
 
 

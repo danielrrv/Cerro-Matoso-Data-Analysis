@@ -4,20 +4,21 @@ date : '`r format(Sys.Date(), "%B %d, %Y")`'
 author: 'Daniel Rodriguez'
 output: 
    html_document:
-    toc: true
-    toc_float:
-      collapsed: false
-      smooth_scroll: false
-
+      toc: true
+      toc_float:
+       collapsed: false
+       smooth_scroll: false
 ---
+
+
 
 
 <style>
 
-p{
+body{
 
-font-family:Helvetica;
-font-weight:400;
+
+font-family: 'Montserrat','verdana' ,sans-serif;
 
 }
 
@@ -42,6 +43,7 @@ This is an data analysis  of some important KPIs in Cerro Matoso,  a Colombian N
 library(dplyr)
 library(tidyr)
 library(readr)
+library(plotly)
 library(readxl)
 library(ggplot2)
 library(corrplot)
@@ -50,14 +52,15 @@ cerro_matoso_1 <- cerro_matoso %>% filter(Flota=="Camiones 777")%>%select(fecha,
 ```
 
 
-## Analysis{.tabset}
+## Analysis
 
 
-### Data
+## Data
 
 
 
-**1. cerro_matoso_1 dataset**
+### Cerro_matoso_1 dataset
+
 The data set consists in 11 variables and 10006 observations. following the dictionary is listed.
 
 
@@ -78,9 +81,8 @@ The data set consists in 11 variables and 10006 observations. following the dict
 knitr::kable(cerro_matoso_1[1:5, ])
 ```
  
- 
-**2. cerro_matoso_group dataset**
- 
+### cerro_matoso_group dataset
+  
  This is a wrangling of the  **cerro_matoso_1**.  You may see the operation in following script.
  
  
@@ -133,7 +135,8 @@ Like disponibilidad, utilizacion a rate of how effective the operation use the e
 
 
  
- **3. cerro_matoso_equipo**
+### Cerro_matoso_equipo dataset. 
+
  
  
 ```{r }
@@ -155,8 +158,8 @@ cerro_matoso_equipo <- cerro_matoso_1%>%group_by(fecha,Equipo)%>%
 
 knitr::kable(cerro_matoso_equipo[1:5, ])
 ```
+###cerro_matoso_gather dataset.
 
-**4. cerro_matoso_gather**
 
 ```{r}
 cerro_matoso_gather<-cerro_matoso_1%>%
@@ -183,9 +186,9 @@ cerro_matoso_gather<-cerro_matoso_1%>%
 knitr::kable(cerro_matoso_gather[1:5, ])
 ```
 
-### plots
+## plots
 
-Ones of the most important mine KPIs are disponibilidad and utilizacion. Both are often taken as part of bussiness cases in which are the features to being optimized. Nevertheless, previously, before this essay both were taken as individual variables without any correlation  to each other. What it is false. The projects were bogus due to just make effort on reducing one of them without see the behavior of the another. what it leds to mistakes and non-appoined result. So it is neeeded whether a correlation exists. To see so, it may be carried out a correlation plot or a inferential analysis(F statistic, T student). However for being sharp, we'd rather liked a Simple linear regression, where whether the changes in utilization are due to chance  and there's no relation with disponibilidad or there's is relation.
+Ones of the most important mine KPIs are disponibilidad and utilizacion. Both are often taken as part of bussiness cases in which are those features to being optimized. Nevertheless, previously, before this essay both were taken as individual variables without any correlation  to each other. What it is false. The projects were bogus due to just make effort on reducing one of them without see the behavior of the another. what it leds  to mistakes and non-appoined result. So it is neeeded whether a correlation exists. To see so, it may be carried out a correlation plot or a inferential analysis(F statistic, T student). However for being  more sharp, we'd rather liked a Simple linear regression, where if the changes onn utilization are due to chance  and there's no relation with disponibilidad or there's is relation.
 
 We can frame this investigation into statistical hyphothesis test
 
@@ -195,7 +198,7 @@ We can frame this investigation into statistical hyphothesis test
 
 
 
-
+### Utilizacion vs Disponibilidad
 ```{r}
 ##----------lays out utilization vs disponibilidad coloured by shift.
 ##----------furthermore,method  simple linear regresion line for more interpretability.
@@ -205,7 +208,9 @@ ggplot(cerro_matoso_group, aes(x=disponibilidad, y=utilizacion, col=Turno))+
 ```
 
 
-As it can seen graphically, there's non-zero slope what it means the change in utilization can be explain with changes in disponibilidad, thereby aren't separeted features. To do a stronger proof. Linear model summary can show a better approach.
+As it can seen graphically, there's non-zero slope what it means the change on utilization can be explain with changes in disponibilidad, thereby aren't separeted features. To do a stronger proof. Linear model summary can show a better approach.
+
+### Linear simple regression.
 
 ```{r}
 
@@ -216,34 +221,53 @@ lm(utilizacion~disponibilidad, data=cerro_matoso_group)%>%
 ```
 
 
-Here can be seen:
+**Here can be seen:**
 
 + p-value of disponibilidad slope is nearly zero, whereby we successfully  reject the null hyphotesis we initially put above.
 + only  8% of utilizacion is explained by disponibilidad(R-squared)
-+ the slope is negative. which it means that when disponibilidad increases less utilization can be performance by  the  mine operation.
++ the slope is negative. which it means that when disponibilidad increases less utilization can be performanced by  the  mine operation.
 
 
 
-The main reason whereby when disponibilidad increases, utilization decreses is because more equipment are available and the same people are using the truck,something like lack of staff.The opposite occurs when the disponibilidad decreases, the utilizacion increase unexpectedly.Then engineers can say, their good management of the flets are giving result.
+The main reason whereby when disponibilidad increases and utilization decreses is because more equipment are available and the same people available,something like lack of staff.The opposite occurs when the disponibilidad decreases, the utilizacion increase unexpectedly.Then engineers can say that their outstandings managements over the fleets are giving results.
 
-```{r}
-ggplot(cerro_matoso_gather,aes(x=fecha, y=value, col=categoria))+geom_line()
+```{r echo=FALSE,warning=F,message=F}
+cerro_matoso_date<-cerro_matoso_1%>%
+  group_by(fecha)%>%
+  summarize(
+    Operativo=sum(Operativo),
+    preventiva=sum(`Mant Preventiva`),
+    planeada=sum(`Mant Planeada`),
+    correctiva=sum(`Mant Correctiva`),
+    overall=sum(`Over Haul`),
+    programada=sum(`Demora Prog `),
+    noprogramada=sum(`Demora Noprog `),
+    stanby=sum(DemoraStandBy))%>%
+  mutate(
+    Tcalendario=(Operativo+preventiva+planeada+correctiva+overall+programada+noprogramada),
+    disponibilidad=(Tcalendario-preventiva-correctiva-planeada-overall)/Tcalendario,
+    utilizacion=Operativo/(Tcalendario-preventiva-correctiva-planeada-overall))%>%
+  select(fecha,disponibilidad, utilizacion) 
+library(dygraphs)
+library(xts)
+cerro_xts<-xts(cerro_matoso_date[,2:3],cerro_matoso_date$fecha)
+dygraph(cerro_xts)%>% dyRangeSelector()
 ```
 
 
-*see when the disponibilidad goes downward the utilizacion goes upward*
+*look at when the disponibilidad goes downward the utilizacion goes upward*
 
 The previous conclusion opens up widely window where we can see the correlation among the perfomance KPIs
 *let's do it!*
 
-**correlation plot**
+### correlation plot.
 
 
 
 ```{r echo=FALSE}
 
 cor_cerro_matoso <- cor(cerro_matoso_group[,3:13])
-corrplot::corrplot(cor_cerro_matoso,type = "upper",order = 'AOE',addCoef.col = T,tl.col = 'black')
+corrplot::corrplot(cor_cerro_matoso,type = "lower",method = "shade",order = 'AOE',addCoef.col = T,tl.col = 'black',tl.cex = 1,number.cex = 0.7 )
 
 ```
 
@@ -251,7 +275,7 @@ corrplot::corrplot(cor_cerro_matoso,type = "upper",order = 'AOE',addCoef.col = T
 Many  hidden correlations suddenly pop up. Yes there's  negative correlation between utilizacion and disponibilidad, isn't strong but it exists.Following conclusions can be taken from the plot
 
 
->First of all, the correlation above is just a pearson correlation that doesn't include categorical variable like **Turno** that can incoporate different aproaches. It may turn out that **simpson's paradox** comes in and the behavior doesn't occur anymore.
+>First of all, the correlation above is just a pearson correlation that doesn’t include categorical variable like Turno that can incoporate different aproaches. It may turn out that simpson’s paradox comes in and the same behavior doesn’t occur anymore.
 
 
 + It looks like Tcalendario has the strongest correlation with Standby. It turns out that when the Tcalendario decrease is because a truck or some truck have been put on standby.
@@ -288,5 +312,45 @@ Look at this! it seems like utilizacion is influenced by Turno when it is night.
 
 
 
+### Truck Performance.
+
+Once utilizacion has been checked, the  original dataset give us more data and more analysis do with. So let's see!
 
 
+
+When we work with groups of data, we want to see a regular behavioir inside the group and between groups. In this case, trucks give operativo time for moving and dumbing raw material, and we need to figure out if  each truck operativo time is within the variable's natural variabiity.An ANOVA can asses whether there are different or not among the trucks and if so, which are below of natural performance and why?.
+
+
+```{r}
+aov(Operativo~Equipo, data=cerro_matoso_equipo)%>%summary()
+
+
+```
++ p-value less than 0.05 means the trucks have difference among the operativo time that they give every Turno(shift).
+
+Let's check which trucks are below
+
+
+```{r}
+d=pairwise.t.test(cerro_matoso_equipo$Operativo,cerro_matoso_equipo$Equipo, alternative = "two.sided")
+d$p.value
+```
+
+
+
+
+
+This is insane!, none has time to see this, this isn't data analysis. Let's see visually. 
+
+```{r}
+
+##---------------------------lays out  a boxplot as a proof of different operativo's time.
+g=ggplot(cerro_matoso_equipo,aes(x=Equipo,y=Operativo, col=Equipo))+geom_boxplot()+ylab('Operativo(hours)')
+ggplotly(g)
+
+
+```
+*The total time given by every truck within a day(24hours)*
+
+
+As you have noticed visually, there almost 4 truck that seem to be underneath of the median. 

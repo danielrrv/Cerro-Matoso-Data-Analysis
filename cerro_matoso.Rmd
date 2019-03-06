@@ -4,10 +4,8 @@ date : '`r format(Sys.Date(), "%B %d, %Y")`'
 author: 'Daniel Rodriguez'
 output: 
    html_document:
-      toc: true
-      toc_float:
-       collapsed: false
-       smooth_scroll: false
+      theme: united
+      highlight: monochrome
 ---
 
 
@@ -41,6 +39,7 @@ This is an data analysis  of some important KPIs in Cerro Matoso,  a Colombian N
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, error=FALSE}
 library(dplyr)
+library(rmdformats)
 library(tidyr)
 library(readr)
 library(plotly)
@@ -158,7 +157,7 @@ cerro_matoso_equipo <- cerro_matoso_1%>%group_by(fecha,Equipo)%>%
 
 knitr::kable(cerro_matoso_equipo[1:5, ])
 ```
-###cerro_matoso_gather dataset.
+### cerro_matoso_gather dataset.
 
 
 ```{r}
@@ -275,7 +274,7 @@ corrplot::corrplot(cor_cerro_matoso,type = "lower",method = "shade",order = 'AOE
 Many  hidden correlations suddenly pop up. Yes there's  negative correlation between utilizacion and disponibilidad, isn't strong but it exists.Following conclusions can be taken from the plot
 
 
->First of all, the correlation above is just a pearson correlation that doesn’t include categorical variable like Turno that can incoporate different aproaches. It may turn out that simpson’s paradox comes in and the same behavior doesn’t occur anymore.
+>First of all, the correlation above is just a pearson correlation that doesn’t include categorical variable like Turno that can incoporate different aproaches. It may turn out that simpsons paradox comes in and the same behavior doesn’t occur anymore.
 
 
 + It looks like Tcalendario has the strongest correlation with Standby. It turns out that when the Tcalendario decrease is because a truck or some truck have been put on standby.
@@ -302,7 +301,7 @@ As it has been shown, simpson's paradox displays other a clue about the effect s
 
 
 ```{r}
-ggplot(cerro_matoso_group, aes(x=stanby, y=utilizacion,col=Turno))+
+cerro_matoso_group %>%filter(stanby>0) %>%ggplot( aes(x=stanby, y=utilizacion,col=Turno))+
   geom_point( )+geom_smooth(se = F,method = lm)
 
 ```
@@ -318,7 +317,7 @@ Once utilizacion has been checked, the  original dataset give us more data and m
 
 
 
-When we work with groups of data, we want to see a regular behavioir inside the group and between groups. In this case, trucks give operativo time for moving and dumbing raw material, and we need to figure out if  each truck operativo time is within the variable's natural variabiity.An ANOVA can asses whether there are different or not among the trucks and if so, which are below of natural performance and why?.
+When we work with groups, we simply want to see a regular behavioir inside the group and between groups, which is  in this case probably difference among the equipments. In this case, trucks give operativo time for moving and dumbing raw material, and we need to figure out if  each truck operativo time is within the variable's natural variabiity or there are differences among.An ANOVA can asses whether there are different or not among the trucks, and if so, which are below of natural performance and why?..  
 
 
 ```{r}
@@ -326,7 +325,7 @@ aov(Operativo~Equipo, data=cerro_matoso_equipo)%>%summary()
 
 
 ```
-+ p-value less than 0.05 means the trucks have difference among the operativo time that they give every Turno(shift).
++ p-value less than 0.05 means the trucks have differences among the operativo time that they give every Turno(shift).
 
 Let's check which trucks are below
 
@@ -354,3 +353,105 @@ ggplotly(g)
 
 
 As you have noticed visually, there almost 4 truck that seem to be underneath of the median. 
+
+
+But our undestanding and conclusions above are barely decent, and  not to look like realible at all. Thereby,  stronger tools are required to do so. Let's pretend, we could scale the performance of each truck, like positions of a race, or qualify each equipment based on its features shown previously in the datasets.Or better, cluster trucks with similar characteris so that we could develop strategics for every set or cluster.
+Yea!, a cluster analysis either a Hierarchical clustering or a K-means clusters can work out  very well. Let's  see how we may set them up and leverage them too.  
+
+```{r echo=FALSE}
+
+matrix_cerro=cerro_matoso_equipo%>%select(Equipo, Operativo, preventiva, correctiva, stanby, planeada, programada, noprogramada, overall,-fecha)%>%ungroup()%>%
+  group_by(Equipo)%>%
+  summarise(sum(Operativo), sum(preventiva), sum(planeada),sum(correctiva),sum(overall), sum(programada), sum(noprogramada), sum(stanby))
+##----------------------generating a matrix----------------------------------------------------
+matrix_trucks=cbind(matrix_cerro$`sum(Operativo)`,matrix_cerro$`sum(preventiva)`,matrix_cerro$`sum(planeada)`,matrix_cerro$`sum(correctiva)`,matrix_cerro$`sum(stanby)`,
+                    matrix_cerro$`sum(planeada)`,matrix_cerro$`sum(programada)`,
+                    matrix_cerro$`sum(noprogramada)`)
+
+names=matrix_cerro[[1]]
+names_col=colnames(cerro_matoso_equipo[,3:10])
+row.names(matrix_trucks)=names
+colnames(matrix_trucks)=names_col
+matrix_trucks
+
+
+
+```
+
+
+The matrix above shows the features list of each truck over the year like just a summary . So how classify and compare trucks based on each feature at the same time.First of all, we'd scale the features for avoiding to compare pears against apples.
+
+```{r}
+
+truck_scaled<-scale(matrix_trucks)
+truck_scaled
+```
+
+Let's talk about how to set up a cluster analysis.
+Imagine we could plot these features in a x-y frame(this case this frame is a 8-dimensions space :( ). It can be seen how trucks with similar values heap up together, whereas different among are detached away.
+
+Something like
+
+$$Distance=1-similar$$
+ This sounds realible and handy. Now do you  roughly remember pitagoras theorem from euclidean geometry for displaying distance between two points.Again this concept can help us to find similiarities.
+Let's show it in R.
+
+
+For instance. The distance between M3-32 and M3-43 is the root of sum of all features of each trucks squared. Recall that  characteristics are currently scaled. 
+
+$$Distance=\sqrt{features^2_{M3-32}+features^2_{M3-43}}$$
+
+
+
+```{r}
+
+truck_distance<-dist(truck_scaled)
+truck_distance
+
+```
+ 
+Now, we are eager for seeing clusters and classifications. 
+
+
+### Hierarchical Clustering 
+
+```{r warning=FALSE, error=FALSE}
+library(factoextra) 
+set.seed(123)
+truck_distance<-dist(truck_scaled,method='euclidean')
+hc_trucks <- hclust(truck_distance, method = 'complete')
+fviz_dend(x = hc_trucks, k = 5,main = 'Cluster Dendrogram of truck fleet, k=5') 
+ 
+```
+
+Here, an hierarchical analysis where the algorithm produces and sort of branches. Each blanch with different color may be seen as a group,where each has trucks that save similarities to each other.For instance, trucks M3-40,M3-34 and M3-43 have features like standby, operativo, preventivo, correctivo, programada ect, that are very close.Likewise, it looks like that those trucks that do not share a bit or nothing are detached altogether.     
+
+
+
+### K-means Clulstering
+
+
+```{r}
+set.seed(123)
+truck_scaled<-scale(matrix_trucks)
+k_truck <- kmeans(truck_scaled, centers = 5)
+fviz_cluster(k_truck, data =truck_scaled,title = 'Cluster Analysis for trucks, K=5')
+```
+
+
+
+
+
+
+
+
+The foundations of each algorithm can be seen [here](https://uc-r.github.io/kmeans_clustering). 
+
+
+### conclusion about cluster.
+
++ Clusters analysis serve as tools for developing specific strategics for each group o segment. So it's just needed to understand how take the best advantage of each, regard to  their characteriscs.
++ It seems that every can be used in different way, improving perfomances of ones, and manage standby times for anothers. 
+Somes trucks need to be analyzed according to their mechanical conditions, trucks with good performance perhaps could work more time, and see how to deal with their preventive, plannned shutdowns times.
++ it would've been great if we could've crossed movements of raw material per truck over the year, for looking at correlations among material moved vs time operative(operativo) and see how productive are the trucks. Maybe a correlations between corrective time(corretivo) vs movements can pops up, or trucks that are very productive(more mterial/time) are the same that are sent to standby many nights. 
++ Develop strategics, productos, services, treatments for each niche(group) can optimized the disponibilidad, and utilizacion.
